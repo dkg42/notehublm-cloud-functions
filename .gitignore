@@ -1,0 +1,21 @@
+node_modules/
+lib/
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+.runtimeconfig.json
+.env
+.env.local
+.env.*.local
+.DS_Store
+
+# Firestore emulator logs
+firestore-debug.log
+firestore-debug.*.log
+
+# IDE
+.idea/
+.vscode/
+
+# Claude Code local settings
+.claude/
