@@ -111,20 +111,56 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
 
   } else if (uid) {
     // For non-subscription events: backfill firebaseUid in the customer doc if it exists
-    db.collection('customers').doc(customerId).set({ email, firebaseUid: uid }, { merge: true });
+    try {
+      await db.collection('customers').doc(customerId).set(
+        { email, firebaseUid: uid },
+        { merge: true }
+      );
+    } catch (err) {
+      logger.error('[webhook] Failed to backfill firebaseUid in customer doc', {
+        customerId,
+        uid,
+        webhookId,
+        eventType,
+        error: (err as Error).message,
+      });
+      res.status(500).json({ error: 'Firestore write failed' });
+      return;
+    }
   }
 
   if (webhookId) {
     addMarkWebhookProcessed(batch, webhookId, eventType);
   }
 
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (err) {
+    logger.error('[webhook] Failed to commit Firestore batch', {
+      customerId,
+      webhookId,
+      eventType,
+      error: (err as Error).message,
+    });
+    res.status(500).json({ error: 'Firestore write failed' });
+    return;
+  }
 
   if (uid && subscriptionResult) {
-    await setSubscriptionClaims(
-      uid,
-      buildClaimsFromCustomerDoc(customerId, subscriptionResult)
-    );
+    try {
+      await setSubscriptionClaims(
+        uid,
+        buildClaimsFromCustomerDoc(customerId, subscriptionResult)
+      );
+    } catch (err) {
+      logger.warn('[webhook] Failed to set subscription claims — subscription data committed, will refresh on next login', {
+        uid,
+        customerId,
+        webhookId,
+        eventType,
+        error: (err as Error).message,
+      });
+    }
   }
 
   res.json({ received: true });

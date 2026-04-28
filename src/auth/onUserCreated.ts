@@ -40,7 +40,25 @@ export async function onUserCreatedHandler(user: UserRecord): Promise<void> {
 
   const batch = db.batch();
   addLinkUidToCustomer(batch, customerId, uid);
-  await batch.commit();
 
-  await setSubscriptionClaims(uid, buildClaimsFromCustomerDoc(customerId, customerData));
+  try {
+    await batch.commit();
+  } catch (err) {
+    logger.error('[onUserCreated] Failed to link Firebase UID to customer doc — will be resolved by next subscription webhook', {
+      uid,
+      customerId,
+      error: (err as Error).message,
+    });
+    return;
+  }
+
+  try {
+    await setSubscriptionClaims(uid, buildClaimsFromCustomerDoc(customerId, customerData));
+  } catch (err) {
+    logger.warn('[onUserCreated] Failed to set subscription claims — will refresh on next login or webhook', {
+      uid,
+      customerId,
+      error: (err as Error).message,
+    });
+  }
 }

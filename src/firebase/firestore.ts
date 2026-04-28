@@ -64,3 +64,17 @@ export function addLinkUidToCustomer(
 ): void {
   batch.update(db.collection('customers').doc(customerId), { firebaseUid: uid });
 }
+
+export async function queryCustomerByUid(
+  firebaseUid: string
+): Promise<{ id: string; data: CustomerDoc } | null> {
+  const snapshot = await db
+    .collection('customers')
+    .where('firebaseUid', '==', firebaseUid)
+    .limit(1)
+    .get();
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  if (!doc) return null;
+  return { id: doc.id, data: doc.data() as CustomerDoc };
+}
