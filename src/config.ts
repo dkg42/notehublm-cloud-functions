@@ -10,7 +10,8 @@ export const config = {
   dodoWebhookSecret: requireEnv('DODO_PAYMENTS_WEBHOOK_SECRET'),
   dodoProductIdProMonthly: requireEnv('DODO_PRODUCT_ID_PRO_MONTHLY'),
   dodoProductIdProYearly: requireEnv('DODO_PRODUCT_ID_PRO_YEARLY'),
-  dodoEnv: process.env['DODO_ENV'] ?? 'test_mode',
+  dodoApiKey: requireEnv('DODO_PAYMENTS_API_KEY'),
+  dodoEnv: (process.env['DODO_ENV'] ?? 'test_mode') as 'live_mode' | 'test_mode',
 } as const;
 
 export function productIdToPlan(productId: string): SubscriptionPlan | null {
