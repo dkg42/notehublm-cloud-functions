@@ -1,5 +1,5 @@
 import { auth } from './admin';
-import type { SubscriptionClaims, SubscriptionStatus, SubscriptionPlan, CustomerDoc } from '../types';
+import type { SubscriptionClaims, CustomerDoc } from '../types';
 
 export async function setSubscriptionClaims(
   uid: string,
