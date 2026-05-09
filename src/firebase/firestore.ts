@@ -2,9 +2,18 @@ import type { WriteBatch } from 'firebase-admin/firestore';
 import { db, FieldValue } from './admin';
 import type { CustomerDoc, SubscriptionStatus, SubscriptionPlan } from '../types';
 
-export async function isWebhookProcessed(webhookId: string): Promise<boolean> {
-  const doc = await db.collection('webhook_events').doc(webhookId).get();
-  return doc.exists;
+export async function tryClaimWebhookId(webhookId: string): Promise<boolean> {
+  try {
+    await db.collection('webhook_events').doc(webhookId).create({
+      receivedAt: FieldValue.serverTimestamp(),
+    });
+    return true;
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === 'already-exists') {
+      return false;
+    }
+    throw err;
+  }
 }
 
 export function addMarkWebhookProcessed(

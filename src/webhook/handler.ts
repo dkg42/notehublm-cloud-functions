@@ -3,14 +3,13 @@ import type { Response } from 'express';
 import { logger } from 'firebase-functions/v2';
 import { verifyWebhookSignature, WebhookVerificationError } from './verify';
 import {
-  isWebhookProcessed,
-  addMarkWebhookProcessed,
+  tryClaimWebhookId,
   addUpsertCustomerDoc,
   getCustomerDoc,
 } from '../firebase/firestore';
 import { resolveFirebaseUid } from '../firebase/userLookup';
 import { setSubscriptionClaims, buildClaimsFromCustomerDoc } from '../firebase/claims';
-import { db } from '../firebase/admin';
+import { db, FieldValue } from '../firebase/admin';
 import { routeSubscriptionEvent } from '../events/subscription';
 import { handlePaymentSucceeded, handlePaymentFailed, handleRefundSucceeded } from '../events/payment';
 import type {
@@ -47,10 +46,13 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
     throw err;
   }
 
-  if (webhookId && (await isWebhookProcessed(webhookId))) {
-    logger.info('[webhook] Duplicate event — skipping', { webhookId });
-    res.json({ received: true });
-    return;
+  if (webhookId) {
+    const claimed = await tryClaimWebhookId(webhookId);
+    if (!claimed) {
+      logger.info('[webhook] Duplicate event — skipping', { webhookId });
+      res.json({ received: true });
+      return;
+    }
   }
 
   const event = JSON.parse(rawBody) as DodoWebhookPayload;
@@ -130,7 +132,10 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
   }
 
   if (webhookId) {
-    addMarkWebhookProcessed(batch, webhookId, eventType);
+    batch.update(db.collection('webhook_events').doc(webhookId), {
+      processedAt: FieldValue.serverTimestamp(),
+      eventType,
+    });
   }
 
   try {

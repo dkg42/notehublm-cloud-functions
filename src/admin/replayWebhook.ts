@@ -13,6 +13,13 @@ import { config, productIdToPlan } from '../config';
 import { checkAdminSecret } from './auth';
 import type { SubscriptionResult, SubscriptionStatus } from '../types';
 
+const dodo = new DodoPayments({
+  bearerToken: config.dodoApiKey,
+  environment: config.dodoEnv,
+  timeout: 10_000,
+  maxRetries: 1,
+});
+
 interface ReplayBody {
   customerId: string;
   subscriptionId?: string;
@@ -51,11 +58,6 @@ export async function replayWebhookHandler(req: Request, res: Response): Promise
   }
 
   logger.info('[adminReplayWebhook] Fetch requested', { customerId, subscriptionId });
-
-  const dodo = new DodoPayments({
-    bearerToken: config.dodoApiKey,
-    environment: config.dodoEnv,
-  });
 
   // Fetch subscription(s) from Dodo
   let sub: { subscription_id: string; status: string; product_id: string; next_billing_date?: string | null; customer: { customer_id: string; email: string } };
