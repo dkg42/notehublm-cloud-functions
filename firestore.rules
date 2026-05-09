@@ -2,8 +2,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /customers/{customerId} {
-      allow read: if request.auth != null
+      // Allow a user to fetch their own customer document by direct ID lookup.
+      allow get: if request.auth != null
+                  && resource != null
+                  && resource.data.firebaseUid is string
+                  && resource.data.firebaseUid == request.auth.uid;
+
+      // Allow querying the customers collection only when filtered to the caller's UID.
+      // Firestore enforces that all returned documents satisfy this predicate,
+      // so a .where('firebaseUid', '==', uid) filter is required by the client.
+      allow list: if request.auth != null
+                   && resource.data.firebaseUid is string
                    && resource.data.firebaseUid == request.auth.uid;
+
       allow write: if false;
     }
 
