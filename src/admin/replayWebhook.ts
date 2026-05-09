@@ -9,16 +9,18 @@ import {
 } from '../firebase/firestore';
 import { resolveFirebaseUid } from '../firebase/userLookup';
 import { setSubscriptionClaims, buildClaimsFromCustomerDoc } from '../firebase/claims';
-import { config, productIdToPlan } from '../config';
+import { dodoApiKey, dodoEnv, productIdToPlan } from '../config';
 import { checkAdminSecret } from './auth';
 import type { SubscriptionResult, SubscriptionStatus } from '../types';
 
-const dodo = new DodoPayments({
-  bearerToken: config.dodoApiKey,
-  environment: config.dodoEnv,
-  timeout: 10_000,
-  maxRetries: 1,
-});
+function getDodo() {
+  return new DodoPayments({
+    bearerToken: dodoApiKey.value(),
+    environment: dodoEnv.value() as 'live_mode' | 'test_mode',
+    timeout: 10_000,
+    maxRetries: 1,
+  });
+}
 
 interface ReplayBody {
   customerId: string;
@@ -63,9 +65,9 @@ export async function replayWebhookHandler(req: Request, res: Response): Promise
   let sub: { subscription_id: string; status: string; product_id: string; next_billing_date?: string | null; customer: { customer_id: string; email: string } };
 
   if (subscriptionId) {
-    sub = await dodo.subscriptions.retrieve(subscriptionId) as typeof sub;
+    sub = await getDodo().subscriptions.retrieve(subscriptionId) as typeof sub;
   } else {
-    const list = await dodo.subscriptions.list({ customer_id: customerId });
+    const list = await getDodo().subscriptions.list({ customer_id: customerId });
     // Prefer active subscription, otherwise take the most recent
     const items = list.items as (typeof sub)[];
     if (!items.length) {
