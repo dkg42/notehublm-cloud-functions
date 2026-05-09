@@ -1,9 +1,7 @@
 import { Webhook, WebhookVerificationError } from 'standardwebhooks';
-import { config } from '../config';
+import { dodoWebhookSecret } from '../config';
 
 export { WebhookVerificationError };
-
-const wh = new Webhook(config.dodoWebhookSecret);
 
 export function verifyWebhookSignature(
   rawBody: string,
@@ -13,5 +11,6 @@ export function verifyWebhookSignature(
     'webhook-signature': string;
   }
 ): void {
+  const wh = new Webhook(dodoWebhookSecret.value());
   wh.verify(rawBody, headers);
 }
