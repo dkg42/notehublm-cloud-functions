@@ -23,6 +23,13 @@ export interface CustomerDoc {
   lastWebhookEvent: string;
 }
 
+// Firestore: user_tokens/{uid}
+export interface UserTokenDoc {
+  googleRefreshToken: string;
+  scope: string;
+  updatedAt: firestore.Timestamp;
+}
+
 // Firestore: webhook_events/{webhookId}
 export interface WebhookEventDoc {
   processedAt: firestore.Timestamp;

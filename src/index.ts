@@ -5,7 +5,10 @@ import { webhookHandler } from './webhook/handler';
 import { onUserCreatedHandler } from './auth/onUserCreated';
 import { syncClaimsHandler } from './admin/syncClaims';
 import { replayWebhookHandler } from './admin/replayWebhook';
-import { dodoWebhookSecret, dodoApiKey } from './config';
+import { storeGoogleTokenHandler } from './token/store';
+import { refreshGoogleTokenHandler } from './token/refresh';
+import { revokeGoogleTokenHandler } from './token/revoke';
+import { dodoWebhookSecret, dodoApiKey, googleClientSecret } from './config';
 
 setGlobalOptions({
   region: 'us-central1',
@@ -22,3 +25,9 @@ export const onUserCreated = functions.auth.user().onCreate(onUserCreatedHandler
 
 export const adminSyncClaims = onRequest({ cors: false, secrets: ['ADMIN_SECRET'] }, syncClaimsHandler);
 export const adminReplayWebhook = onRequest({ cors: false, secrets: ['ADMIN_SECRET', dodoApiKey] }, replayWebhookHandler);
+
+// Google OAuth token lifecycle — proxy endpoints called by the Chrome extension
+// The client_secret never leaves these functions; the extension authenticates via Firebase ID token
+export const storeGoogleToken = onRequest({ cors: true, secrets: [] }, storeGoogleTokenHandler);
+export const refreshGoogleToken = onRequest({ cors: true, secrets: [googleClientSecret] }, refreshGoogleTokenHandler);
+export const revokeGoogleToken = onRequest({ cors: true, secrets: [] }, revokeGoogleTokenHandler);
