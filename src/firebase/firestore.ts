@@ -1,6 +1,6 @@
 import type { WriteBatch } from 'firebase-admin/firestore';
 import { db, FieldValue } from './admin';
-import type { CustomerDoc, SubscriptionStatus, SubscriptionPlan } from '../types';
+import type { CustomerDoc, SubscriptionStatus, SubscriptionPlan, UserTokenDoc } from '../types';
 
 export async function tryClaimWebhookId(webhookId: string): Promise<boolean> {
   try {
@@ -86,4 +86,23 @@ export async function queryCustomerByUid(
   const doc = snapshot.docs[0];
   if (!doc) return null;
   return { id: doc.id, data: doc.data() as CustomerDoc };
+}
+
+// ── user_tokens/{uid} ────────────────────────────────────────────────────────
+
+export async function getUserToken(uid: string): Promise<UserTokenDoc | null> {
+  const snap = await db.collection('user_tokens').doc(uid).get();
+  return snap.exists ? (snap.data() as UserTokenDoc) : null;
+}
+
+export async function saveUserToken(uid: string, googleRefreshToken: string, scope: string): Promise<void> {
+  await db.collection('user_tokens').doc(uid).set({
+    googleRefreshToken,
+    scope,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+export async function deleteUserToken(uid: string): Promise<void> {
+  await db.collection('user_tokens').doc(uid).delete();
 }
