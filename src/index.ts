@@ -1,5 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https';
-import { setGlobalOptions } from 'firebase-functions/v2';
+import { logger, setGlobalOptions } from 'firebase-functions/v2';
 import * as functions from 'firebase-functions/v1';
 import { webhookHandler } from './webhook/handler';
 import { onUserCreatedHandler } from './auth/onUserCreated';
@@ -8,7 +8,16 @@ import { replayWebhookHandler } from './admin/replayWebhook';
 import { storeGoogleTokenHandler } from './token/store';
 import { refreshGoogleTokenHandler } from './token/refresh';
 import { revokeGoogleTokenHandler } from './token/revoke';
-import { dodoWebhookSecret, dodoApiKey, googleClientSecret } from './config';
+import { dodoWebhookSecret, dodoApiKey, googleClientSecret, allowedOrigins } from './config';
+
+function tokenCors(): true | string[] {
+  const raw = allowedOrigins.value().trim();
+  if (!raw) {
+    logger.warn('[index] ALLOWED_ORIGINS is unset — token endpoints accept any origin');
+    return true;
+  }
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+}
 
 setGlobalOptions({
   region: 'us-central1',
@@ -28,6 +37,6 @@ export const adminReplayWebhook = onRequest({ cors: false, secrets: ['ADMIN_SECR
 
 // Google OAuth token lifecycle — proxy endpoints called by the Chrome extension
 // The client_secret never leaves these functions; the extension authenticates via Firebase ID token
-export const storeGoogleToken = onRequest({ cors: true, secrets: [] }, storeGoogleTokenHandler);
-export const refreshGoogleToken = onRequest({ cors: true, secrets: [googleClientSecret] }, refreshGoogleTokenHandler);
-export const revokeGoogleToken = onRequest({ cors: true, secrets: [] }, revokeGoogleTokenHandler);
+export const storeGoogleToken = onRequest({ cors: tokenCors(), secrets: [] }, storeGoogleTokenHandler);
+export const refreshGoogleToken = onRequest({ cors: tokenCors(), secrets: [googleClientSecret] }, refreshGoogleTokenHandler);
+export const revokeGoogleToken = onRequest({ cors: tokenCors(), secrets: [] }, revokeGoogleTokenHandler);

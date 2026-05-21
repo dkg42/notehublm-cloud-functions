@@ -4,10 +4,10 @@ import { logger } from 'firebase-functions/v2';
 import { verifyWebhookSignature, WebhookVerificationError } from './verify';
 import {
   tryClaimWebhookId,
+  releaseWebhookClaim,
   addUpsertCustomerDoc,
-  getCustomerDoc,
 } from '../firebase/firestore';
-import { resolveFirebaseUid } from '../firebase/userLookup';
+import { resolveCustomerAndUid } from '../firebase/userLookup';
 import { setSubscriptionClaims, buildClaimsFromCustomerDoc } from '../firebase/claims';
 import { db, FieldValue } from '../firebase/admin';
 import { routeSubscriptionEvent } from '../events/subscription';
@@ -39,7 +39,10 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
     });
   } catch (err) {
     if (err instanceof WebhookVerificationError) {
-      logger.warn('[webhook] Signature verification failed', { error: err.message, webhookId });
+      logger.warn('[webhook] Signature verification failed', {
+        errorType: err.constructor.name,
+        webhookId,
+      });
       res.status(401).json({ error: 'Invalid signature' });
       return;
     }
@@ -64,7 +67,7 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
   const customerId = eventData.customer.customer_id;
   const email = eventData.customer.email;
 
-  const uid = await resolveFirebaseUid(customerId, email);
+  const { uid, customerDoc } = await resolveCustomerAndUid(customerId, email);
 
   let subscriptionResult: SubscriptionResult | null = null;
 
@@ -78,16 +81,13 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
   } else if (eventType === 'payment.failed') {
     const paymentData = event.data as PaymentEventData;
     handlePaymentFailed(paymentData);
-    if (paymentData.subscription_id) {
-      const existing = await getCustomerDoc(customerId);
-      if (existing?.subscriptionStatus === 'active') {
-        subscriptionResult = {
-          subscriptionStatus: 'on_hold',
-          subscriptionPlan: existing.subscriptionPlan,
-          subscriptionId: paymentData.subscription_id,
-          currentPeriodEnd: existing.currentPeriodEnd,
-        };
-      }
+    if (paymentData.subscription_id && customerDoc?.subscriptionStatus === 'active') {
+      subscriptionResult = {
+        subscriptionStatus: 'on_hold',
+        subscriptionPlan: customerDoc.subscriptionPlan,
+        subscriptionId: paymentData.subscription_id,
+        currentPeriodEnd: customerDoc.currentPeriodEnd,
+      };
     }
   } else if (eventType === 'refund.succeeded') {
     handleRefundSucceeded(event.data as RefundEventData);
@@ -113,22 +113,11 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
 
   } else if (uid) {
     // For non-subscription events: backfill firebaseUid in the customer doc if it exists
-    try {
-      await db.collection('customers').doc(customerId).set(
-        { email, firebaseUid: uid },
-        { merge: true }
-      );
-    } catch (err) {
-      logger.error('[webhook] Failed to backfill firebaseUid in customer doc', {
-        customerId,
-        uid,
-        webhookId,
-        eventType,
-        error: (err as Error).message,
-      });
-      res.status(500).json({ error: 'Firestore write failed' });
-      return;
-    }
+    batch.set(
+      db.collection('customers').doc(customerId),
+      { email, firebaseUid: uid },
+      { merge: true }
+    );
   }
 
   if (webhookId) {
@@ -141,12 +130,22 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
   try {
     await batch.commit();
   } catch (err) {
-    logger.error('[webhook] Failed to commit Firestore batch', {
+    logger.error('[webhook] Failed to commit Firestore batch — releasing claim so Dodo can retry', {
       customerId,
       webhookId,
       eventType,
       error: (err as Error).message,
     });
+    if (webhookId) {
+      try {
+        await releaseWebhookClaim(webhookId);
+      } catch (releaseErr) {
+        logger.error('[webhook] Failed to release webhook claim — event may not retry', {
+          webhookId,
+          error: (releaseErr as Error).message,
+        });
+      }
+    }
     res.status(500).json({ error: 'Firestore write failed' });
     return;
   }
