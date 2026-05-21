@@ -22,11 +22,17 @@ export async function revokeGoogleTokenHandler(req: Request, res: Response): Pro
 
   if (tokenDoc?.googleRefreshToken) {
     try {
-      await fetch(REVOKE_ENDPOINT, {
+      const response = await fetch(REVOKE_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ token: tokenDoc.googleRefreshToken }),
       });
+      if (!response.ok) {
+        logger.info('[revokeGoogleToken] Google returned non-OK on revoke (continuing cleanup)', {
+          uid,
+          status: response.status,
+        });
+      }
     } catch (err) {
       // Revocation is best-effort — log and continue to Firestore cleanup
       logger.warn('[revokeGoogleToken] Revocation request failed (continuing cleanup)', { uid, err });

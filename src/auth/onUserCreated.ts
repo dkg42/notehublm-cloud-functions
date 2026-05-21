@@ -9,6 +9,16 @@ import { setSubscriptionClaims, buildClaimsFromCustomerDoc } from '../firebase/c
 interface UserRecord {
   uid: string;
   email?: string;
+  emailVerified?: boolean;
+  providerData?: { providerId: string }[];
+}
+
+// OAuth providers that guarantee a verified email by virtue of the sign-in flow.
+const VERIFIED_EMAIL_PROVIDERS = new Set(['google.com']);
+
+function hasVerifiedEmail(user: UserRecord): boolean {
+  if (user.emailVerified) return true;
+  return (user.providerData ?? []).some(p => VERIFIED_EMAIL_PROVIDERS.has(p.providerId));
 }
 
 export async function onUserCreatedHandler(user: UserRecord): Promise<void> {
@@ -16,6 +26,14 @@ export async function onUserCreatedHandler(user: UserRecord): Promise<void> {
 
   if (!email) {
     logger.info('[onUserCreated] User has no email, skipping subscription lookup', { uid });
+    return;
+  }
+
+  if (!hasVerifiedEmail(user)) {
+    logger.warn('[onUserCreated] Email not verified — refusing to link any existing subscription', {
+      uid,
+      email,
+    });
     return;
   }
 

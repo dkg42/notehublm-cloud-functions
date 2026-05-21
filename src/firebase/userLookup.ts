@@ -1,23 +1,29 @@
 import { logger } from 'firebase-functions/v2';
 import { auth } from './admin';
 import { getCustomerDoc } from './firestore';
+import type { CustomerDoc } from '../types';
 
-export async function resolveFirebaseUid(
+export interface ResolvedCustomer {
+  uid: string | null;
+  customerDoc: CustomerDoc | null;
+}
+
+export async function resolveCustomerAndUid(
   customerId: string,
   email: string
-): Promise<string | null> {
+): Promise<ResolvedCustomer> {
   const customerDoc = await getCustomerDoc(customerId);
   if (customerDoc?.firebaseUid) {
-    return customerDoc.firebaseUid;
+    return { uid: customerDoc.firebaseUid, customerDoc };
   }
 
   try {
     const user = await auth.getUserByEmail(email);
-    return user.uid;
+    return { uid: user.uid, customerDoc };
   } catch (err: unknown) {
     if ((err as { code?: string }).code === 'auth/user-not-found') {
       logger.info('[userLookup] No Firebase user found for email — storing subscription without UID', { email });
-      return null;
+      return { uid: null, customerDoc };
     }
     throw err;
   }

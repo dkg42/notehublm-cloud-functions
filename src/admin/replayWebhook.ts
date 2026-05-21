@@ -2,24 +2,22 @@ import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import { logger } from 'firebase-functions/v2';
 import DodoPayments from 'dodopayments';
-import { db } from '../firebase/admin';
-import {
-  addMarkWebhookProcessed,
-  addUpsertCustomerDoc,
-} from '../firebase/firestore';
-import { resolveFirebaseUid } from '../firebase/userLookup';
+import { db, FieldValue } from '../firebase/admin';
+import { addUpsertCustomerDoc } from '../firebase/firestore';
+import { resolveCustomerAndUid } from '../firebase/userLookup';
 import { setSubscriptionClaims, buildClaimsFromCustomerDoc } from '../firebase/claims';
 import { dodoApiKey, dodoEnv, productIdToPlan } from '../config';
 import { checkAdminSecret } from './auth';
 import type { SubscriptionResult, SubscriptionStatus } from '../types';
 
-function getDodo() {
-  return new DodoPayments({
+let dodoClient: DodoPayments | undefined;
+function getDodo(): DodoPayments {
+  return (dodoClient ??= new DodoPayments({
     bearerToken: dodoApiKey.value(),
     environment: dodoEnv.value() as 'live_mode' | 'test_mode',
     timeout: 10_000,
     maxRetries: 1,
-  });
+  }));
 }
 
 interface ReplayBody {
@@ -88,7 +86,7 @@ export async function replayWebhookHandler(req: Request, res: Response): Promise
   };
 
   const email = sub.customer.email;
-  const uid = await resolveFirebaseUid(customerId, email);
+  const { uid } = await resolveCustomerAndUid(customerId, email);
 
   const batch = db.batch();
   addUpsertCustomerDoc(batch, customerId, {
@@ -100,8 +98,13 @@ export async function replayWebhookHandler(req: Request, res: Response): Promise
     currentPeriodEnd: subscriptionResult.currentPeriodEnd,
     lastWebhookEvent: 'admin.replay',
   });
-  // Mark a synthetic webhook ID so this replay is idempotent
-  addMarkWebhookProcessed(batch, `admin_replay_${customerId}`, 'admin.replay');
+  // Audit-only trail for this replay — unique per-call, never collides with real webhook IDs
+  const replayAuditId = `admin_replay_${customerId}_${Date.now()}`;
+  batch.create(db.collection('webhook_events').doc(replayAuditId), {
+    receivedAt: FieldValue.serverTimestamp(),
+    processedAt: FieldValue.serverTimestamp(),
+    eventType: 'admin.replay',
+  });
 
   try {
     await batch.commit();

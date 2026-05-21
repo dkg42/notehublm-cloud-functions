@@ -1,90 +1,36 @@
 import { productIdToPlan } from '../config';
-import type { SubscriptionEventData, SubscriptionResult } from '../types';
+import type { SubscriptionEventData, SubscriptionResult, SubscriptionStatus } from '../types';
 
-export function handleSubscriptionActive(data: SubscriptionEventData): SubscriptionResult {
-  return {
-    subscriptionStatus: 'active',
-    subscriptionPlan: productIdToPlan(data.product_id),
-    subscriptionId: data.subscription_id,
-    currentPeriodEnd: data.next_billing_date ?? null,
-  };
+interface EventMapping {
+  status: SubscriptionStatus;
+  clearPlan: boolean;
+  clearPeriodEnd: boolean;
 }
 
-export function handleSubscriptionRenewed(data: SubscriptionEventData): SubscriptionResult {
-  return {
-    subscriptionStatus: 'active',
-    subscriptionPlan: productIdToPlan(data.product_id),
-    subscriptionId: data.subscription_id,
-    currentPeriodEnd: data.next_billing_date ?? null,
-  };
-}
-
-export function handleSubscriptionPlanChanged(data: SubscriptionEventData): SubscriptionResult {
-  return {
-    subscriptionStatus: 'active',
-    subscriptionPlan: productIdToPlan(data.product_id),
-    subscriptionId: data.subscription_id,
-    currentPeriodEnd: data.next_billing_date ?? null,
-  };
-}
-
-export function handleSubscriptionCancelled(data: SubscriptionEventData): SubscriptionResult {
-  return {
-    subscriptionStatus: 'cancelled',
-    subscriptionPlan: productIdToPlan(data.product_id),
-    subscriptionId: data.subscription_id,
-    // Keep period end so the extension can show "access until X"
-    currentPeriodEnd: data.next_billing_date ?? null,
-  };
-}
-
-export function handleSubscriptionExpired(data: SubscriptionEventData): SubscriptionResult {
-  return {
-    subscriptionStatus: 'expired',
-    subscriptionPlan: null,
-    subscriptionId: data.subscription_id,
-    currentPeriodEnd: null,
-  };
-}
-
-export function handleSubscriptionOnHold(data: SubscriptionEventData): SubscriptionResult {
-  return {
-    subscriptionStatus: 'on_hold',
-    subscriptionPlan: productIdToPlan(data.product_id),
-    subscriptionId: data.subscription_id,
-    currentPeriodEnd: data.next_billing_date ?? null,
-  };
-}
-
-export function handleSubscriptionFailed(data: SubscriptionEventData): SubscriptionResult {
-  return {
-    subscriptionStatus: 'none',
-    subscriptionPlan: null,
-    subscriptionId: data.subscription_id,
-    currentPeriodEnd: null,
-  };
-}
+const STATUS_BY_EVENT: Record<string, EventMapping> = {
+  // Active states — keep plan + period end so the client can show "renews on X"
+  'subscription.active':       { status: 'active',    clearPlan: false, clearPeriodEnd: false },
+  'subscription.renewed':      { status: 'active',    clearPlan: false, clearPeriodEnd: false },
+  'subscription.plan_changed': { status: 'active',    clearPlan: false, clearPeriodEnd: false },
+  // Cancelled — keep period end so the client can show "access until X"
+  'subscription.cancelled':    { status: 'cancelled', clearPlan: false, clearPeriodEnd: false },
+  'subscription.on_hold':      { status: 'on_hold',   clearPlan: false, clearPeriodEnd: false },
+  // Terminal states — clear plan + period end
+  'subscription.expired':      { status: 'expired',   clearPlan: true,  clearPeriodEnd: true  },
+  'subscription.failed':       { status: 'none',      clearPlan: true,  clearPeriodEnd: true  },
+};
 
 export function routeSubscriptionEvent(
   eventType: string,
   data: SubscriptionEventData
 ): SubscriptionResult | null {
-  switch (eventType) {
-    case 'subscription.active':
-      return handleSubscriptionActive(data);
-    case 'subscription.renewed':
-      return handleSubscriptionRenewed(data);
-    case 'subscription.plan_changed':
-      return handleSubscriptionPlanChanged(data);
-    case 'subscription.cancelled':
-      return handleSubscriptionCancelled(data);
-    case 'subscription.expired':
-      return handleSubscriptionExpired(data);
-    case 'subscription.on_hold':
-      return handleSubscriptionOnHold(data);
-    case 'subscription.failed':
-      return handleSubscriptionFailed(data);
-    default:
-      return null;
-  }
+  const mapping = STATUS_BY_EVENT[eventType];
+  if (!mapping) return null;
+
+  return {
+    subscriptionStatus: mapping.status,
+    subscriptionPlan: mapping.clearPlan ? null : productIdToPlan(data.product_id),
+    subscriptionId: data.subscription_id,
+    currentPeriodEnd: mapping.clearPeriodEnd ? null : (data.next_billing_date ?? null),
+  };
 }

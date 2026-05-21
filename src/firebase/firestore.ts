@@ -16,6 +16,10 @@ export async function tryClaimWebhookId(webhookId: string): Promise<boolean> {
   }
 }
 
+export async function releaseWebhookClaim(webhookId: string): Promise<void> {
+  await db.collection('webhook_events').doc(webhookId).delete();
+}
+
 export function addMarkWebhookProcessed(
   batch: WriteBatch,
   webhookId: string,

@@ -56,8 +56,13 @@ export async function refreshGoogleTokenHandler(req: Request, res: Response): Pr
   if (!response.ok) {
     logger.warn('[refreshGoogleToken] Google token endpoint error', { uid, error: body.error });
     if (body.error === 'invalid_grant') {
-      // Refresh token is revoked or expired — clean up Firestore
-      await deleteUserToken(uid).catch(() => {});
+      // Refresh token is revoked or expired — clean up Firestore (best-effort)
+      await deleteUserToken(uid).catch((deleteErr: unknown) => {
+        logger.warn('[refreshGoogleToken] Failed to delete revoked token doc', {
+          uid,
+          error: (deleteErr as Error).message,
+        });
+      });
       res.status(401).json({ error: 'invalid_grant', message: body.error_description });
     } else {
       res.status(502).json({ error: body.error ?? 'token_refresh_failed', message: body.error_description });
