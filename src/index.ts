@@ -35,8 +35,9 @@ export const onUserCreated = functions.auth.user().onCreate(onUserCreatedHandler
 export const adminSyncClaims = onRequest({ cors: false, secrets: ['ADMIN_SECRET'] }, syncClaimsHandler);
 export const adminReplayWebhook = onRequest({ cors: false, secrets: ['ADMIN_SECRET', dodoApiKey] }, replayWebhookHandler);
 
-// Google OAuth token lifecycle — proxy endpoints called by the Chrome extension
-// The client_secret never leaves these functions; the extension authenticates via Firebase ID token
-export const storeGoogleToken = onRequest({ cors: tokenCors(), secrets: [] }, storeGoogleTokenHandler);
+// Google OAuth token lifecycle — proxy endpoints called by the website iframe and Chrome extension.
+// The client_secret never leaves these functions. `storeGoogleToken` accepts a GIS auth code
+// (no Firebase session required yet); `refresh`/`revoke` are authenticated via Firebase ID token.
+export const storeGoogleToken = onRequest({ cors: tokenCors(), secrets: [googleClientSecret] }, storeGoogleTokenHandler);
 export const refreshGoogleToken = onRequest({ cors: tokenCors(), secrets: [googleClientSecret] }, refreshGoogleTokenHandler);
 export const revokeGoogleToken = onRequest({ cors: tokenCors(), secrets: [] }, revokeGoogleTokenHandler);
