@@ -8,6 +8,7 @@ import { replayWebhookHandler } from './admin/replayWebhook';
 import { storeGoogleTokenHandler } from './token/store';
 import { refreshGoogleTokenHandler } from './token/refresh';
 import { revokeGoogleTokenHandler } from './token/revoke';
+import { createDodoPortalSessionHandler } from './customer/portal';
 import { dodoWebhookSecret, dodoApiKey, googleClientSecret, allowedOrigins } from './config';
 
 function tokenCors(): true | string[] {
@@ -41,3 +42,7 @@ export const adminReplayWebhook = onRequest({ cors: false, secrets: ['ADMIN_SECR
 export const storeGoogleToken = onRequest({ cors: tokenCors(), secrets: [googleClientSecret] }, storeGoogleTokenHandler);
 export const refreshGoogleToken = onRequest({ cors: tokenCors(), secrets: [googleClientSecret] }, refreshGoogleTokenHandler);
 export const revokeGoogleToken = onRequest({ cors: tokenCors(), secrets: [] }, revokeGoogleTokenHandler);
+
+// Dodo customer portal session — authenticated via Firebase ID token. Resolves the
+// caller's Dodo customerId from Firestore and returns a time-bound portal link.
+export const createDodoPortalSession = onRequest({ cors: tokenCors(), secrets: [dodoApiKey] }, createDodoPortalSessionHandler);
