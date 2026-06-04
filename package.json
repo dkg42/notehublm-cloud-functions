@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "lib/index.js",
   "scripts": {
@@ -22,7 +22,7 @@
     "standardwebhooks": "^1.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^22.0.0",
     "concurrently": "^9.2.1",
     "eslint": "^10.3.0",
     "firebase-tools": "^15.15.0",
