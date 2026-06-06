@@ -1,5 +1,4 @@
-import type { Request } from 'firebase-functions/v2/https';
-import type { Response } from 'express';
+import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import { OAuth2Client } from 'google-auth-library';
 import { auth } from '../firebase/admin';
@@ -40,16 +39,15 @@ interface GoogleCodeExchangeResponse {
  *   4. Website signs into Firebase with the custom token; subsequent token refreshes
  *      go through `refreshGoogleToken`.
  */
-export async function storeGoogleTokenHandler(req: Request, res: Response): Promise<void> {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const { code, redirectUri } = req.body as StoreTokenBody;
+export async function storeGoogleTokenHandler(request: CallableRequest<StoreTokenBody>): Promise<{
+  customToken: string;
+  accessToken: string;
+  expiresIn: number;
+  scope: string;
+}> {
+  const { code, redirectUri } = request.data;
   if (!code || !redirectUri) {
-    res.status(400).json({ error: 'code and redirectUri are required' });
-    return;
+    throw new HttpsError('invalid-argument', 'code and redirectUri are required');
   }
 
   const clientId = googleClientId.value();
@@ -75,27 +73,23 @@ export async function storeGoogleTokenHandler(req: Request, res: Response): Prom
         error: exchange.error,
         description: exchange.error_description,
       });
-      res.status(400).json({
-        error: exchange.error ?? 'code_exchange_failed',
+      throw new HttpsError('invalid-argument', exchange.error ?? 'code_exchange_failed', {
         message: exchange.error_description,
       });
-      return;
     }
   } catch (err) {
+    if (err instanceof HttpsError) throw err;
     logger.error('[storeGoogleToken] Network error during code exchange', { err });
-    res.status(502).json({ error: 'Failed to reach Google token endpoint' });
-    return;
+    throw new HttpsError('unavailable', 'Failed to reach Google token endpoint');
   }
 
   if (!exchange.refresh_token) {
     // Without prompt=consent on the client, Google may skip the refresh_token
     // if this user already granted these scopes recently. Tell the caller to retry.
     logger.warn('[storeGoogleToken] No refresh_token returned from Google');
-    res.status(400).json({
-      error: 'missing_refresh_token',
+    throw new HttpsError('failed-precondition', 'missing_refresh_token', {
       message: 'Google did not return a refresh_token. Ensure the client uses prompt=consent.',
     });
-    return;
   }
 
   // 2. Verify the id_token and extract user identity
@@ -106,14 +100,12 @@ export async function storeGoogleTokenHandler(req: Request, res: Response): Prom
     payload = ticket.getPayload() ?? {};
   } catch (err) {
     logger.error('[storeGoogleToken] id_token verification failed', { err });
-    res.status(400).json({ error: 'invalid_id_token' });
-    return;
+    throw new HttpsError('invalid-argument', 'invalid_id_token');
   }
 
   const email = payload.email;
   if (!email) {
-    res.status(400).json({ error: 'id_token missing email claim' });
-    return;
+    throw new HttpsError('invalid-argument', 'id_token missing email claim');
   }
 
   // 3. Resolve (or create) the Firebase user for this email
@@ -133,8 +125,7 @@ export async function storeGoogleTokenHandler(req: Request, res: Response): Prom
       logger.info('[storeGoogleToken] Created new Firebase user', { uid, email });
     } else {
       logger.error('[storeGoogleToken] getUserByEmail failed', { err });
-      res.status(500).json({ error: 'user_lookup_failed' });
-      return;
+      throw new HttpsError('internal', 'user_lookup_failed');
     }
   }
 
@@ -143,10 +134,10 @@ export async function storeGoogleTokenHandler(req: Request, res: Response): Prom
   const customToken = await auth.createCustomToken(uid);
 
   logger.info('[storeGoogleToken] Token stored', { uid });
-  res.json({
+  return {
     customToken,
     accessToken: exchange.access_token,
     expiresIn: exchange.expires_in,
     scope: exchange.scope,
-  });
+  };
 }

@@ -1,21 +1,13 @@
-import type { Request } from 'firebase-functions/v2/https';
-import type { Response } from 'express';
+import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import { getUserToken, deleteUserToken } from '../firebase/firestore';
-import { verifyAuthHeader } from './verify-firebase-token';
 
 const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 
-export async function revokeGoogleTokenHandler(req: Request, res: Response): Promise<void> {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const uid = await verifyAuthHeader(req.headers.authorization);
+export async function revokeGoogleTokenHandler(request: CallableRequest<unknown>): Promise<{ success: true }> {
+  const uid = request.auth?.uid;
   if (!uid) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
+    throw new HttpsError('unauthenticated', 'Sign-in required');
   }
 
   const tokenDoc = await getUserToken(uid);
@@ -41,5 +33,5 @@ export async function revokeGoogleTokenHandler(req: Request, res: Response): Pro
 
   await deleteUserToken(uid);
   logger.info('[revokeGoogleToken] Token revoked and deleted', { uid });
-  res.json({ success: true });
+  return { success: true };
 }

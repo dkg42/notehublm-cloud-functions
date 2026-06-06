@@ -1,8 +1,6 @@
-import type { Request } from 'firebase-functions/v2/https';
-import type { Response } from 'express';
+import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import DodoPayments from 'dodopayments';
-import { verifyAuthHeader } from '../token/verify-firebase-token';
 import { queryCustomerByUid } from '../firebase/firestore';
 import { dodoApiKey, dodoEnv } from '../config';
 
@@ -16,22 +14,15 @@ function getDodo(): DodoPayments {
   }));
 }
 
-export async function createDodoPortalSessionHandler(req: Request, res: Response): Promise<void> {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const uid = await verifyAuthHeader(req.headers.authorization);
+export async function createDodoPortalSessionHandler(request: CallableRequest<unknown>): Promise<{ link: string }> {
+  const uid = request.auth?.uid;
   if (!uid) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
+    throw new HttpsError('unauthenticated', 'Sign-in required');
   }
 
   const customer = await queryCustomerByUid(uid);
   if (!customer || customer.data.subscriptionStatus !== 'active') {
-    res.status(403).json({ error: 'no_active_subscription' });
-    return;
+    throw new HttpsError('permission-denied', 'no_active_subscription');
   }
 
   let session: { link: string };
@@ -43,10 +34,9 @@ export async function createDodoPortalSessionHandler(req: Request, res: Response
       customerId: customer.id,
       error: (err as Error).message,
     });
-    res.status(502).json({ error: 'dodo_api_error', message: (err as Error).message });
-    return;
+    throw new HttpsError('unavailable', 'dodo_api_error', { message: (err as Error).message });
   }
 
   logger.info('[createDodoPortalSession] Portal session created', { uid, customerId: customer.id });
-  res.json({ link: session.link });
+  return { link: session.link };
 }
