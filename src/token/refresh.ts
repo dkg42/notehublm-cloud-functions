@@ -1,8 +1,6 @@
-import type { Request } from 'firebase-functions/v2/https';
-import type { Response } from 'express';
+import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import { getUserToken, saveUserToken, deleteUserToken } from '../firebase/firestore';
-import { verifyAuthHeader } from './verify-firebase-token';
 import { googleClientId, googleClientSecret } from '../config';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
@@ -15,22 +13,19 @@ interface GoogleTokenResponse {
   refresh_token?: string;
 }
 
-export async function refreshGoogleTokenHandler(req: Request, res: Response): Promise<void> {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const uid = await verifyAuthHeader(req.headers.authorization);
+export async function refreshGoogleTokenHandler(request: CallableRequest<unknown>): Promise<{
+  accessToken: string;
+  expiresIn: number;
+  scope: string;
+}> {
+  const uid = request.auth?.uid;
   if (!uid) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
+    throw new HttpsError('unauthenticated', 'Sign-in required');
   }
 
   const tokenDoc = await getUserToken(uid);
   if (!tokenDoc) {
-    res.status(404).json({ error: 'No stored token found for this user' });
-    return;
+    throw new HttpsError('not-found', 'No stored token found for this user');
   }
 
   let response: globalThis.Response;
@@ -47,8 +42,7 @@ export async function refreshGoogleTokenHandler(req: Request, res: Response): Pr
     });
   } catch (err) {
     logger.error('[refreshGoogleToken] Network error calling Google token endpoint', { uid, err });
-    res.status(502).json({ error: 'Failed to reach Google token endpoint' });
-    return;
+    throw new HttpsError('unavailable', 'Failed to reach Google token endpoint');
   }
 
   const body = await response.json() as GoogleTokenResponse & { error?: string; error_description?: string };
@@ -63,11 +57,9 @@ export async function refreshGoogleTokenHandler(req: Request, res: Response): Pr
           error: (deleteErr as Error).message,
         });
       });
-      res.status(401).json({ error: 'invalid_grant', message: body.error_description });
-    } else {
-      res.status(502).json({ error: body.error ?? 'token_refresh_failed', message: body.error_description });
+      throw new HttpsError('unauthenticated', 'invalid_grant', { message: body.error_description });
     }
-    return;
+    throw new HttpsError('unavailable', body.error ?? 'token_refresh_failed', { message: body.error_description });
   }
 
   // If Google rotated the refresh token, persist the new one
@@ -77,9 +69,9 @@ export async function refreshGoogleTokenHandler(req: Request, res: Response): Pr
   }
 
   logger.info('[refreshGoogleToken] Token refreshed', { uid });
-  res.json({
+  return {
     accessToken: body.access_token,
     expiresIn: body.expires_in,
     scope: body.scope,
-  });
+  };
 }
