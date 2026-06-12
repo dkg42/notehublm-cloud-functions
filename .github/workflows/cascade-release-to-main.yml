@@ -1,0 +1,55 @@
+name: Cascade release → main
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+permissions:
+  contents: write        # needed to merge the PR into main
+  pull-requests: write
+
+jobs:
+  open-backmerge-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need full history so "no diff" check works
+
+      - name: Open back-merge PR and auto-merge if conflict-free
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+
+          # Skip if release has nothing main is missing.
+          if git diff --quiet "origin/main...HEAD"; then
+            echo "No commits ahead of main; nothing to cascade."
+            exit 0
+          fi
+
+          # Reuse an open PR if present, else create one (capture its number).
+          number=$(gh pr list --base main --head "$BRANCH" \
+            --state open --json number --jq '.[0].number')
+          if [ -z "$number" ]; then
+            number=$(gh pr create --base main --head "$BRANCH" \
+              --title "Cascade $BRANCH → main" \
+              --body "Automated back-merge of release fixes into main." \
+              | grep -oE '[0-9]+$')
+          fi
+
+          # GitHub computes mergeability asynchronously — poll until known.
+          state="UNKNOWN"
+          for i in $(seq 1 10); do
+            state=$(gh pr view "$number" --json mergeable --jq '.mergeable')
+            [ "$state" != "UNKNOWN" ] && break
+            sleep 3
+          done
+
+          if [ "$state" = "MERGEABLE" ]; then
+            gh pr merge "$number" --merge --delete-branch=false
+            echo "No conflicts → PR #$number merged into main."
+          else
+            echo "PR #$number not auto-mergeable (state=$state); left open for manual resolution."
+          fi
