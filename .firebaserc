@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "notehublm-a2490"
+    "default": "notehublm-a2490",
+    "staging": "notehublm-a2490",
+    "prod": "notehublm-prod"
   }
 }
