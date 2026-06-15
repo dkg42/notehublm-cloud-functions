@@ -16,7 +16,7 @@ Firebase project: `notehublm-a2490`
 
 | Layer | Technology |
 |---|---|
-| Runtime | Node.js 20 |
+| Runtime | Node.js 22 |
 | Language | TypeScript 5.4 (strict mode, NodeNext modules) |
 | Framework | Firebase Functions v2 (HTTP), v1 (Auth trigger) |
 | Database | Cloud Firestore |
@@ -236,6 +236,24 @@ Claims (`SubscriptionClaims`) are set server-side only. Clients read them from t
 | `DODO_ENV` | String param | No (default: `test_mode`) | `test_mode` or `live_mode` |
 
 Secrets are defined with `defineSecret()` (Firebase Functions params) and injected at runtime. String params use `defineString()`. Local values go in `.env.local`; production values in `.env` or Firebase Secret Manager.
+
+### Environment strategy
+
+Firebase Functions resolves `.env` files with later files overriding earlier:
+`.env` → `.env.<projectId>`. `.env.local` is emulator-only and is **never
+deployed**. `DODO_ENV` defaults to `test_mode` in `config.ts` (fail-safe — a
+missing var can never accidentally go live).
+
+| Alias (`.firebaserc`) | Project | `DODO_ENV` | Config file |
+|---|---|---|---|
+| `default` / `staging` | `notehublm-a2490` | `test_mode` | `.env.notehublm-a2490` (committed, non-secret) |
+| `prod` | `<prod project id>` | `live_mode` | `.env.<prod project id>` (committed, non-secret) |
+
+The base `.env` holds fail-safe `test_mode` defaults; each project-specific file
+fully specifies that environment (product IDs, `ALLOWED_ORIGINS`, `DODO_ENV`).
+Secrets are never in `.env` files — set them per project with
+`firebase functions:secrets:set <NAME> --project <id>`. Deploy with an explicit
+target: `firebase deploy --only functions --project prod`.
 
 ---
 
