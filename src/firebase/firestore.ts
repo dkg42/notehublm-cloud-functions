@@ -20,17 +20,6 @@ export async function releaseWebhookClaim(webhookId: string): Promise<void> {
   await db.collection('webhook_events').doc(webhookId).delete();
 }
 
-export function addMarkWebhookProcessed(
-  batch: WriteBatch,
-  webhookId: string,
-  eventType: string
-): void {
-  batch.set(db.collection('webhook_events').doc(webhookId), {
-    processedAt: FieldValue.serverTimestamp(),
-    eventType,
-  });
-}
-
 export async function getCustomerDoc(customerId: string): Promise<CustomerDoc | null> {
   const snap = await db.collection('customers').doc(customerId).get();
   return snap.exists ? (snap.data() as CustomerDoc) : null;

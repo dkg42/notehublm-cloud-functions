@@ -1,7 +1,13 @@
 {
   "name": "notehublm-cloud-functions",
   "version": "1.0.0",
+  "description": "Firebase Cloud Functions backend for NoteHub LM: Dodo Payments webhooks, subscription claims, and Google OAuth token brokerage.",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dkg42/notehublm-cloud-functions.git"
+  },
   "engines": {
     "node": "22"
   },
@@ -23,7 +29,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "concurrently": "^9.2.1",
     "eslint": "^10.3.0",
     "firebase-tools": "^15.15.0",
     "typescript": "^5.4.0",

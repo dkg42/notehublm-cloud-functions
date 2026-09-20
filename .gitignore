@@ -4,10 +4,16 @@ lib/
 firebase-debug.log
 firebase-debug.*.log
 .runtimeconfig.json
-.env
-.env.local
-.env.*.local
 .DS_Store
+
+# Environment files.
+# Ignore every .env* by default so a new file can never be committed by accident,
+# then explicitly allow back the two secret-free, project-scoped config files.
+# Anything holding a real credential must stay out of git — see SECURITY.md.
+.env*
+!.env.example
+!.env.notehublm-a2490
+!.env.notehublm-prod
 
 # Firestore emulator logs
 firestore-debug.log
@@ -17,5 +23,7 @@ firestore-debug.*.log
 .idea/
 .vscode/
 
-# Claude Code local settings
+# Agent tooling. `.agents/` is restored from skills-lock.json by the Firebase CLI;
+# it is local scaffolding, not part of the backend.
 .claude/
+.agents/
