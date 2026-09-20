@@ -11,13 +11,22 @@ import { revokeGoogleTokenHandler } from './token/revoke';
 import { createDodoPortalSessionHandler } from './customer/portal';
 import { dodoWebhookSecret, dodoApiKey, googleClientSecret, allowedOrigins } from './config';
 
-function tokenCors(): true | string[] {
-  const raw = allowedOrigins.value().trim();
-  if (!raw) {
-    logger.warn('[index] ALLOWED_ORIGINS is unset — token endpoints accept any origin');
-    return true;
+// CORS allowlist for the callable endpoints. Fails CLOSED: an unset or empty
+// ALLOWED_ORIGINS yields an empty allowlist, so no browser origin is permitted
+// and every cross-origin call is rejected. A misconfigured deploy therefore
+// breaks loudly instead of quietly exposing the OAuth broker to any origin.
+function tokenCors(): string[] {
+  const origins = allowedOrigins.value()
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (!origins.length) {
+    logger.error(
+      '[index] ALLOWED_ORIGINS is unset — callable endpoints will reject all ' +
+      'cross-origin requests. Set it for this project and redeploy.'
+    );
   }
-  return raw.split(',').map(s => s.trim()).filter(Boolean);
+  return origins;
 }
 
 setGlobalOptions({
