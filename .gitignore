@@ -7,13 +7,11 @@ firebase-debug.*.log
 .DS_Store
 
 # Environment files.
-# Ignore every .env* by default so a new file can never be committed by accident,
-# then explicitly allow back the two secret-free, project-scoped config files.
-# Anything holding a real credential must stay out of git — see SECURITY.md.
+# No .env file of any kind is tracked. `.env.example` is the only committed
+# template; every real environment file — including the per-project
+# `.env.<projectId>` files read at deploy time — stays local. See SECURITY.md.
 .env*
 !.env.example
-!.env.notehublm-a2490
-!.env.notehublm-prod
 
 # Firestore emulator logs
 firestore-debug.log

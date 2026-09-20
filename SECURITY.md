@@ -117,11 +117,11 @@ satisfiable by the rule, forcing a `where('firebaseUid', '==', uid)` filter.
 
 ### Secret management
 
-No secret is ever committed. The committed `.env.<projectId>` files hold
-non-secret configuration only: Dodo product IDs, the public OAuth client ID, the
-Dodo mode, and CORS origin allowlists. `.gitignore` ignores all `.env*` files by
-default and re-allows only those known-safe files, so a newly created env file
-cannot be committed by accident.
+No environment file is tracked in this repository. `.gitignore` excludes every
+`.env*` path except the `.env.example` template, so neither a secret nor an
+environment-specific value can be committed by accident. This applies equally to
+the per-project `.env.<projectId>` files read at deploy time — they are created
+locally from the template and stay on the operator's machine.
 
 Runtime secrets are stored in Google Secret Manager and injected per function:
 

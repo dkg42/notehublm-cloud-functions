@@ -70,8 +70,8 @@ These are the parts where a plausible-looking change causes real damage.
   path must keep the two consistent, and must be replayable via `adminSyncClaims`.
 - **Never return a refresh token, client secret, or API key to a caller.** Check
   every new response shape against this.
-- **Never put a secret in a committed `.env.<projectId>` file.** Those files are
-  tracked. Use Secret Manager.
+- **Never commit an env file.** No `.env*` is tracked except `.env.example`, and
+  it must stay that way. Secrets go to Secret Manager.
 - **Email-based account linking requires a verified email.** Do not relax the
   check in `onUserCreated`.
 - **Deploy with an explicit `--project`.** The `default` alias points at the

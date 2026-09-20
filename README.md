@@ -329,12 +329,27 @@ Two deliberate fail-safes:
 - Each project file fully specifies its environment rather than relying on
   inheritance, so reading one file tells you the whole story.
 
-**The committed `.env.<projectId>` files contain non-secret configuration only** —
-product IDs, the public OAuth client ID, and origin allowlists. Secrets are set
-per project through Secret Manager and never appear in a committed file:
+**No `.env` file of any kind is tracked in this repository.** `.gitignore`
+excludes every `.env*` except the `.env.example` template, so neither secrets nor
+environment-specific configuration can be committed by accident.
+
+That means a fresh clone cannot deploy until the environment files are recreated
+locally from [`.env.example`](.env.example):
+
+```bash
+cp .env.example .env.local              # emulator work
+cp .env.example .env.notehublm-a2490    # staging deploys
+cp .env.example .env.notehublm-prod     # production deploys
+```
+
+Populate the non-secret values in those files. The four secrets belong in Secret
+Manager, per project, never in a file:
 
 ```bash
 firebase functions:secrets:set DODO_PAYMENTS_WEBHOOK_SECRET --project prod
+firebase functions:secrets:set DODO_PAYMENTS_API_KEY        --project prod
+firebase functions:secrets:set GOOGLE_CLIENT_SECRET         --project prod
+firebase functions:secrets:set ADMIN_SECRET                 --project prod
 ```
 
 ---

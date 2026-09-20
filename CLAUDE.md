@@ -87,8 +87,8 @@ is `ADMIN_SECRET`, read via `process.env` in `src/admin/auth.ts`.)
   fails.** Dropping the release silently swallows events; dropping the claim
   double-processes billing.
 - **Never return a refresh token, client secret, or API key in a response.**
-- **Never put a secret in `.env` or `.env.<projectId>`** — those are committed.
-  Secrets go to Secret Manager; `.env.local` is gitignored and emulator-only.
+- **Never commit an env file.** No `.env*` is tracked except `.env.example`;
+  `.env.local` and `.env.<projectId>` are local-only. Secrets go to Secret Manager.
 - **`onUserCreated` links by email and must keep requiring a verified email**,
   or an unverified signup can inherit someone else's subscription.
 - **Log identifiers, never tokens or raw payloads.** Structured logging with a
@@ -99,8 +99,8 @@ is `ADMIN_SECRET`, read via `process.env` in `src/admin/auth.ts`.)
 - `DODO_ENV` defaults to `test_mode` in `config.ts` — a deliberate fail-safe.
   Never change the default.
 - `ALLOWED_ORIGINS` fails **closed**: empty means `tokenCors()` returns `[]` and
-  every cross-origin callable request is rejected (logged at error level). Both
-  committed project env files set it; a new project must too, or its clients break.
+  every cross-origin callable request is rejected (logged at error level). Every
+  `.env.<projectId>` must set it, or that project's clients break.
 - App Check is intentionally not enforced — reCAPTCHA v3 can't run in the Chrome
   extension. Don't add `enforceAppCheck: true` without an extension-compatible
   provider.
